@@ -339,7 +339,9 @@ const handler = createMcpHandler(
             console.log(`Document creation API call succeeded`);
           } catch (createError) {
             console.error("Document creation failed:");
-            console.error(createError.stack || createError);
+            console.error(
+              createError instanceof Error ? createError.stack : createError
+            );
             throw createError;
           }
 
@@ -619,35 +621,14 @@ const handler = createMcpHandler(
   },
   {
     capabilities: {
-      tools: {
-        echo: {
-          description: "Echo a message",
-        },
-        list_github_issues: {
-          description: "List open issues from a GitHub repository",
-        },
-        get_oura_stress_recovery: {
-          description:
-            "Get stress and recovery indicators from OURA for the last 7 days",
-        },
-        create_google_doc_for_issue: {
-          description:
-            "Create a Google Doc for a GitHub issue with repo and issue details",
-        },
-        edit_google_doc: {
-          description: "Append content to an existing Google Doc",
-        },
-        add_github_issue_comment: {
-          description: "Add a comment to a GitHub issue",
-        },
-      },
+      tools: {},
     },
   },
   {
     basePath: "/mcp",
     verboseLogs: true,
     maxDuration: 60,
-    disableSse: false,
+    disableSse: !process.env.REDIS_URL,
     redisUrl: process.env.REDIS_URL,
   }
 );

@@ -128,18 +128,14 @@ const handler = createMcpHandler(
   },
   {
     capabilities: {
-      tools: {
-        list_github_issues: {
-          description: "Get a list of open issues from a GitHub repository",
-        },
-      },
+      tools: {},
     },
   },
   {
     basePath: "/mcp/github-issues",
     verboseLogs: true,
     maxDuration: 60,
-    disableSse: false,
+    disableSse: !process.env.REDIS_URL,
     redisUrl: process.env.REDIS_URL,
   }
 );
