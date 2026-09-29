@@ -13,78 +13,23 @@
 
 ## Step 2: Get a Refresh Token
 
-Run this script to get your refresh token:
-
-```javascript
-// save as get-refresh-token.mjs
-import { google } from "googleapis";
-import http from "http";
-import { URL } from "url";
-
-const CLIENT_ID = "YOUR_CLIENT_ID";
-const CLIENT_SECRET = "YOUR_CLIENT_SECRET";
-const REDIRECT_URI = "http://localhost:3000/oauth2callback";
-
-const oauth2Client = new google.auth.OAuth2(
-  CLIENT_ID,
-  CLIENT_SECRET,
-  REDIRECT_URI
-);
-
-const scopes = [
-  "https://www.googleapis.com/auth/documents",
-  "https://www.googleapis.com/auth/drive.file",
-];
-
-const url = oauth2Client.generateAuthUrl({
-  access_type: "offline",
-  scope: scopes,
-  prompt: "consent", // Force consent to get refresh token
-});
-
-console.log("Open this URL in your browser:");
-console.log(url);
-console.log("\nWaiting for authorization...");
-
-const server = http.createServer(async (req, res) => {
-  if (req.url.startsWith("/oauth2callback")) {
-    const qs = new URL(req.url, "http://localhost:3000").searchParams;
-    const code = qs.get("code");
-
-    res.end("Authorization successful! You can close this window.");
-
-    try {
-      const { tokens } = await oauth2Client.getToken(code);
-      console.log("\n✅ Success! Add these to your .env.local:");
-      console.log(`GOOGLE_CLIENT_ID="${CLIENT_ID}"`);
-      console.log(`GOOGLE_CLIENT_SECRET="${CLIENT_SECRET}"`);
-      console.log(`GOOGLE_REFRESH_TOKEN="${tokens.refresh_token}"`);
-
-      server.close();
-      process.exit(0);
-    } catch (error) {
-      console.error("Error getting tokens:", error);
-      server.close();
-      process.exit(1);
-    }
-  }
-});
-
-server.listen(3000, () => {
-  console.log("Server listening on http://localhost:3000");
-});
-```
+The repo ships this script at `scripts/get-refresh-token.mjs`. It prompts for
+your Client ID and Secret, opens a local callback server on port 3001 (port
+3000 is left free for `next dev`), and prints the values for `.env.local`.
 
 ## Step 3: Run the Script
 
 ```bash
-node get-refresh-token.mjs
+node scripts/get-refresh-token.mjs
 ```
 
-1. Open the URL in your browser
-2. Sign in with your Google account
-3. Grant permissions
+1. Paste your Client ID and Client Secret when prompted
+2. Open the printed URL in your browser
+3. Sign in with your Google account and grant permissions
 4. Copy the output values to `.env.local`
+
+> The OAuth client's **Authorized redirect URI** must include
+> `http://localhost:3001/oauth2callback`.
 
 ## Step 4: Update .env.local
 

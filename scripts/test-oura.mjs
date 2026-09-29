@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
-const origin = process.argv[2] || "http://localhost:3000";
+const origin = process.argv[2] || "http://localhost:3000/mcp";
 const days = process.argv[3] ? parseInt(process.argv[3]) : 7;
 
 async function main() {

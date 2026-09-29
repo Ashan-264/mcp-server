@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const origin = process.argv[2] || "http://localhost:3000";
+const origin = process.argv[2] || "http://localhost:3000/mcp";
 
 async function main() {
   // Create transport with custom fetch that adds required headers
@@ -9,13 +9,12 @@ async function main() {
     new URL(`${origin}/mcp`),
     {
       fetch: async (url, init) => {
-        return fetch(url, {
-          ...init,
-          headers: {
-            ...init.headers,
-            Accept: "application/json, text/event-stream",
-          },
-        });
+        // init.headers may be a Headers instance, a string[][], or a plain
+        // object. Spreading a Headers instance yields {} and silently drops
+        // every header, so normalize through Headers instead.
+        const headers = new Headers(init?.headers);
+        headers.set("Accept", "application/json, text/event-stream");
+        return fetch(url, { ...init, headers });
       },
     }
   );

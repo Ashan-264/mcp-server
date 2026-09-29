@@ -45,6 +45,26 @@ async function main() {
     if (req.url.startsWith("/oauth2callback")) {
       const qs = new URL(req.url, "http://localhost:3001").searchParams;
       const code = qs.get("code");
+      const authError = qs.get("error");
+
+      // Consent denied, or Google redirected back without a code.
+      if (authError || !code) {
+        const reason = authError || "no authorization code was returned";
+        res.writeHead(400, { "Content-Type": "text/html" });
+        res.end(`
+        <html>
+          <body style="font-family: system-ui; padding: 40px; text-align: center;">
+            <h1 style="color: #E53935;">❌ Authorization Failed</h1>
+            <p>${reason}</p>
+          </body>
+        </html>
+      `);
+        console.error(`❌ Authorization failed: ${reason}`);
+        server.close();
+        rl.close();
+        process.exit(1);
+        return;
+      }
 
       res.writeHead(200, { "Content-Type": "text/html" });
       res.end(`
@@ -58,6 +78,19 @@ async function main() {
 
       try {
         const { tokens } = await oauth2Client.getToken(code);
+
+        // Google only returns a refresh token on the first consent for a
+        // client; without one the .env.local value would read "undefined".
+        if (!tokens.refresh_token) {
+          console.error(
+            "❌ No refresh token returned. Revoke this app's access at " +
+              "https://myaccount.google.com/permissions and run this script again."
+          );
+          server.close();
+          rl.close();
+          process.exit(1);
+          return;
+        }
 
         console.log("✅ Success! Add these to your .env.local:\n");
         console.log(`GOOGLE_CLIENT_ID="${CLIENT_ID.trim()}"`);

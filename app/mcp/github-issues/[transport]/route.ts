@@ -8,9 +8,12 @@ interface GitHubIssue {
   labels: Array<{ name: string }>;
   assignees: Array<{ login: string }>;
   html_url: string;
+  pull_request?: unknown;
 }
 
-// GitHub Issues MCP Server
+// GitHub Issues MCP Server. Serves the MCP transports under
+// /mcp/github-issues: streamable HTTP at /mcp/github-issues/mcp,
+// SSE at /mcp/github-issues/sse, and SSE messages at /mcp/github-issues/message.
 const handler = createMcpHandler(
   async (server) => {
     server.tool(
@@ -22,7 +25,7 @@ const handler = createMcpHandler(
       },
       async ({ owner, repo }) => {
         const token = process.env.GITHUB_TOKEN;
-        
+
         if (!token) {
           return {
             content: [
@@ -38,11 +41,14 @@ const handler = createMcpHandler(
         try {
           // Fetch open issues from GitHub API
           const response = await fetch(
-            `https://api.github.com/repos/${owner}/${repo}/issues?state=open`,
+            `https://api.github.com/repos/${encodeURIComponent(
+              owner
+            )}/${encodeURIComponent(repo)}/issues?state=open&per_page=100`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
-                Accept: "application/vnd.github.v3+json",
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
                 "User-Agent": "MCP-Server",
               },
             }
@@ -64,9 +70,7 @@ const handler = createMcpHandler(
           const issues: GitHubIssue[] = await response.json();
 
           // Filter out pull requests (they appear in issues endpoint)
-          const actualIssues = issues.filter(
-            (issue) => !("pull_request" in issue)
-          );
+          const actualIssues = issues.filter((issue) => !issue.pull_request);
 
           if (actualIssues.length === 0) {
             return {
@@ -81,8 +85,10 @@ const handler = createMcpHandler(
 
           // Format the issues
           const issueList = actualIssues.map((issue) => {
-            const labels = issue.labels.map((label) => label.name).join(", ");
-            const assignees = issue.assignees
+            const labels = (issue.labels ?? [])
+              .map((label) => label.name)
+              .join(", ");
+            const assignees = (issue.assignees ?? [])
               .map((assignee) => assignee.login)
               .join(", ");
 
@@ -117,7 +123,9 @@ const handler = createMcpHandler(
             content: [
               {
                 type: "text",
-                text: `Error fetching issues: ${error instanceof Error ? error.message : String(error)}`,
+                text: `Error fetching issues: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
               },
             ],
             isError: true,
@@ -136,10 +144,13 @@ const handler = createMcpHandler(
     },
   },
   {
+    // Must match the directory holding the [transport] segment.
     basePath: "/mcp/github-issues",
     verboseLogs: true,
     maxDuration: 60,
-    disableSse: false,
+    // SSE needs Redis to relay messages between the /sse and /message
+    // requests; without it mcp-handler crashes the process on connect.
+    disableSse: !process.env.REDIS_URL,
     redisUrl: process.env.REDIS_URL,
   }
 );

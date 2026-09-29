@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
-const origin = process.argv[2] || "http://localhost:3000";
+const origin = process.argv[2] || "http://localhost:3000/mcp/github-issues";
 const owner = process.argv[3];
 const repo = process.argv[4];
 

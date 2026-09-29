@@ -18,7 +18,8 @@ This repo currently includes tools for:
 
 ## Project Structure (key parts)
 
-- `app/mcp/route.ts` — main MCP server route (tools are defined here)
+- `app/mcp/[transport]/route.ts` — main MCP server route (tools are defined here)
+- `app/mcp/github-issues/[transport]/route.ts` — standalone GitHub Issues MCP server
 - `scripts/` — small Node.js clients and helpers to test the MCP server
   - `scripts/test-tool-call.mjs` — calls the `echo` tool
   - `scripts/test-github-issues.mjs` — calls `list_github_issues`
@@ -28,11 +29,25 @@ This repo currently includes tools for:
   - `scripts/test-oura.mjs` — calls `get_oura_stress_recovery`
   - `scripts/get-refresh-token.mjs` — generates a Google OAuth refresh token for `.env.local`
 
-> Note: `app/mcp/sse/route.ts` and `app/mcp/message/route.ts` exist in the repo, but currently appear to be the same content as `app/mcp/route.ts` (same blob SHA). The canonical implementation is `app/mcp/route.ts`.
+### Endpoints
+
+`mcp-handler` derives all three transport endpoints from `basePath`, and the
+`[transport]` dynamic segment serves them from one file:
+
+| Transport | Main server | GitHub Issues server |
+| --- | --- | --- |
+| Streamable HTTP | `/mcp/mcp` | `/mcp/github-issues/mcp` |
+| SSE | `/mcp/sse` | `/mcp/github-issues/sse` |
+| SSE messages | `/mcp/message` | `/mcp/github-issues/message` |
+
+Streamable HTTP is the recommended transport and works with no extra services.
+The SSE endpoints are only enabled when `REDIS_URL` is set — Redis relays
+messages between the `/sse` and `/message` requests. Without it they return
+`404 Not found`.
 
 ## Available MCP Tools
 
-Defined in `app/mcp/route.ts`:
+Defined in `app/mcp/[transport]/route.ts`:
 
 ### `echo`
 **Args**
@@ -158,63 +173,81 @@ Then copy the printed values into `.env.local`.
 pnpm dev
 ```
 
-By default, Next.js runs on `http://localhost:3000`.
+By default, Next.js runs on `http://localhost:3000`, so the main MCP server is
+mounted at `http://localhost:3000/mcp`.
 
 ## Testing with the included sample clients
 
-### List tools / connect
+Each script takes the **server base URL** (the `basePath`, not the transport
+endpoint) as its first argument and appends the transport segment itself. All
+arguments below match each script's default, so you can omit them when the
+server is on port 3000.
+
+### Streamable HTTP (no Redis required)
 
 ```bash
-node scripts/test-client.mjs http://localhost:3000
+node scripts/test-streamable-fixed.mjs http://localhost:3000/mcp
+node scripts/test-streamable-http-client.mjs http://localhost:3000/mcp
 ```
 
-### Call echo
+### SSE clients
+
+> These use the SSE transport, so they need `REDIS_URL` set in `.env.local`.
+> Without Redis the `/sse` endpoint returns `404 Not found`.
+
+#### List tools / connect
 
 ```bash
-node scripts/test-tool-call.mjs http://localhost:3000
+node scripts/test-client.mjs http://localhost:3000/mcp
 ```
 
-### List GitHub issues
+#### Call echo
 
 ```bash
-node scripts/test-github-issues.mjs http://localhost:3000 <owner> <repo>
+node scripts/test-tool-call.mjs http://localhost:3000/mcp
+```
+
+#### List GitHub issues
+
+```bash
+node scripts/test-github-issues.mjs http://localhost:3000/mcp/github-issues <owner> <repo>
 # Example:
-node scripts/test-github-issues.mjs http://localhost:3000 microsoft vscode
+node scripts/test-github-issues.mjs http://localhost:3000/mcp/github-issues microsoft vscode
 ```
 
-### Add a GitHub issue comment
+#### Add a GitHub issue comment
 
 ```bash
-node scripts/test-add-comment.mjs http://localhost:3000 <owner> <repo> <issue-number> "your comment"
+node scripts/test-add-comment.mjs http://localhost:3000/mcp <owner> <repo> <issue-number> "your comment"
 ```
 
-### Create a Google Doc for an issue
+#### Create a Google Doc for an issue
 
 ```bash
-node scripts/test-google-doc.mjs http://localhost:3000 <owner> <repo> <issue-number>
+node scripts/test-google-doc.mjs http://localhost:3000/mcp <owner> <repo> <issue-number>
 ```
 
-### Append to an existing Google Doc
+#### Append to an existing Google Doc
 
 ```bash
-node scripts/test-edit-doc.mjs http://localhost:3000 <document-id> "Text to append"
+node scripts/test-edit-doc.mjs http://localhost:3000/mcp <document-id> "Text to append"
 ```
 
-### Fetch Oura stress/recovery
+#### Fetch Oura stress/recovery
 
 ```bash
-node scripts/test-oura.mjs http://localhost:3000 7
+node scripts/test-oura.mjs http://localhost:3000/mcp 7
 ```
 
 ## Deployment Notes (Vercel)
 
-The existing README notes:
-- SSE transport may require a Redis instance (`REDIS_URL`) and enabling SSE in the handler config.
+- The SSE transport requires a Redis instance (`REDIS_URL`); it is enabled
+  automatically when that variable is set.
 - Consider enabling Vercel Fluid Compute for longer-running requests.
 
-In `app/mcp/route.ts`, the MCP handler is configured with:
-- `basePath: "/mcp"`
-- `disableSse: false`
+In `app/mcp/[transport]/route.ts`, the MCP handler is configured with:
+- `basePath: "/mcp"` (must match the directory holding the `[transport]` segment)
+- `disableSse: !process.env.REDIS_URL`
 - `redisUrl: process.env.REDIS_URL`
 - `maxDuration: 60`
 

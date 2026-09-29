@@ -11,6 +11,11 @@ const compat = new FlatCompat({
 });
 
 const config = [
+    // Flat config only ignores node_modules by default. Without this, `eslint .`
+    // walks the generated build output and runs out of memory.
+    {
+        ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"],
+    },
     ...fixupConfigRules(compat.extends("next/core-web-vitals")),
 ];
 
